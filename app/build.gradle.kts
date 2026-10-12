@@ -1,6 +1,16 @@
+import java.util.Properties
+import java.io.FileInputStream
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(FileInputStream(localPropertiesFile))
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -17,6 +27,9 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "SUPABASE_URL", "\"${localProperties.getProperty("SUPABASE_URL")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${localProperties.getProperty("SUPABASE_ANON_KEY")}\"")
     }
 
     buildTypes {
@@ -32,6 +45,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -44,6 +58,15 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+
+    implementation(platform(libs.supabase.bom))
+    implementation(libs.supabase.auth)
+    implementation(libs.ktor.client.okhttp)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
+
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
