@@ -1,11 +1,14 @@
 package pe.edu.uap.inventario.data.repository
 
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.providers.builtin.IDToken
 import pe.edu.uap.inventario.data.remote.SupabaseClientProvider
 
 interface AuthRepository {
     suspend fun login(email: String, password: String): Result<Unit>
+    suspend fun loginWithGoogle(idToken: String): Result<Unit>
     fun hasActiveSession(): Boolean
     suspend fun logout(): Result<Unit>
     fun getCurrentUserEmail(): String?
@@ -21,6 +24,18 @@ class AuthRepositoryImpl : AuthRepository {
             auth.signInWith(Email) {
                 this.email = email
                 this.password = password
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun loginWithGoogle(idToken: String): Result<Unit> {
+        return try {
+            auth.signInWith(IDToken) {
+                this.idToken = idToken
+                this.provider = Google
             }
             Result.success(Unit)
         } catch (e: Exception) {
