@@ -1,4 +1,5 @@
 import { google } from "npm:googleapis@144";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 // ── Tipos por categoría ──────────────────────────────────────────────
 interface EquipoBase {
@@ -65,10 +66,27 @@ async function leerPestana(sheets: any, sheetId: string, nombre: string): Promis
   return res.data.values ?? [];
 }
 
+const DOMINIO_PERMITIDO = "@autonoma.pe";
+
+async function usuarioAutorizado(req: Request): Promise<boolean> {
+  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (!token) return false;
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+  );
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) return false;
+  return (data.user.email ?? "").toLowerCase().endsWith(DOMINIO_PERMITIDO);
+}
+
 // ── Handler principal ──────────────────────────────────────────────
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Método no permitido" }), { status: 405 });
+  }
+  if (!(await usuarioAutorizado(req))) {
+    return Response.json({ error: "No autorizado" }, { status: 401 });
   }
 
   let identificador: string;
