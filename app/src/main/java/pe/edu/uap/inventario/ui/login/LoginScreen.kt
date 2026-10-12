@@ -122,7 +122,7 @@ fun LoginScreen(
                         )
                     } else {
                         Text(
-                            text = "Continuar con Google (@autonoma.pe)",
+                            text = "Continuar con Google",
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -209,7 +209,7 @@ fun LoginScreen(
                         .height(48.dp),
                     enabled = !isLoading
                 ) {
-                    Text("Iniciar sesión con contraseña")
+                    Text("Iniciar sesión")
                 }
             }
         }

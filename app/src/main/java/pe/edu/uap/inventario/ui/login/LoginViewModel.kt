@@ -7,7 +7,7 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,26 +24,47 @@ class LoginViewModel(
     private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
+    private val _isLoggedIn = MutableStateFlow(authRepository.hasActiveSession())
+    val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
+
+    fun getCurrentUserName(): String? = authRepository.getCurrentUserName()
+
+    fun logout() {
+        viewModelScope.launch {
+            authRepository.logout()
+            _uiState.value = LoginUiState.Idle
+            _isLoggedIn.value = false
+        }
+    }
+
+    fun onLoginSuccess() {
+        _isLoggedIn.value = true
+        _uiState.value = LoginUiState.Success
+    }
+
     fun loginWithGoogle(context: Context) {
         _uiState.value = LoginUiState.Loading
 
         viewModelScope.launch {
             try {
                 val credentialManager = CredentialManager.create(context)
-                val googleIdOption = GetGoogleIdOption.Builder()
-                    .setFilterByAuthorizedAccounts(false)
-                    .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
-                    .setAutoSelectEnabled(false)
-                    .build()
+
+                // GetSignInWithGoogleOption: la opción oficial para botones que abre el selector de cuentas
+                val signInOption = GetSignInWithGoogleOption.Builder(
+                    serverClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
+                ).build()
 
                 val request = GetCredentialRequest.Builder()
-                    .addCredentialOption(googleIdOption)
+                    .addCredentialOption(signInOption)
                     .build()
 
                 val result = credentialManager.getCredential(context = context, request = request)
                 val credential = result.credential
 
-                if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                if (credential is CustomCredential &&
+                    (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL ||
+                            credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_SIWG_CREDENTIAL)
+                ) {
                     val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                     val idToken = googleIdTokenCredential.idToken
 
@@ -54,7 +75,7 @@ class LoginViewModel(
                         },
                         onFailure = { error ->
                             _uiState.value = LoginUiState.Error(
-                                error.message ?: "No se pudo iniciar sesión con Google"
+                                error.message ?: "No se pudo iniciar sesión con Google en Supabase"
                             )
                         }
                     )
@@ -62,7 +83,7 @@ class LoginViewModel(
                     _uiState.value = LoginUiState.Error("Tipo de credencial no soportado")
                 }
             } catch (e: GetCredentialCancellationException) {
-                // El usuario simplemente cerró la ventana de Google sin seleccionar cuenta
+                // El usuario simplemente cerró la ventana de Google
                 _uiState.value = LoginUiState.Idle
             } catch (e: Exception) {
                 _uiState.value = LoginUiState.Error(
@@ -111,23 +132,5 @@ class LoginViewModel(
         if (_uiState.value is LoginUiState.Error) {
             _uiState.value = LoginUiState.Idle
         }
-    }
-
-    private val _isLoggedIn = MutableStateFlow(authRepository.hasActiveSession())
-    val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
-
-    fun getCurrentUserName(): String? = authRepository.getCurrentUserName()
-
-    fun logout() {
-        viewModelScope.launch {
-            authRepository.logout()
-            _uiState.value = LoginUiState.Idle
-            _isLoggedIn.value = false
-        }
-    }
-
-    fun onLoginSuccess() {
-        _isLoggedIn.value = true
-        _uiState.value = LoginUiState.Success
     }
 }
