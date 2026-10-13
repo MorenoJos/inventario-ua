@@ -37,6 +37,9 @@ import pe.edu.uap.inventario.ui.busqueda.EquipoFila
 
 import pe.edu.uap.inventario.ui.escaneo.CamaraPreview
 
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -101,11 +104,16 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "¡Bienvenido, $userName!",
-                        style = MaterialTheme.typography.titleLarge,
+                    BasicText(
+                        text = "¡Bienvenido, $userName!",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        autoSize = TextAutoSize.StepBased(
+                            minFontSize = 14.sp,
+                            maxFontSize = MaterialTheme.typography.titleLarge.fontSize
+                        )
                     )
                     Text(
                         "Sesión activa en Almacén 5C",
@@ -125,7 +133,11 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(160.dp)
-                    .border(1.dp, MaterialTheme.colorScheme.outline)
+                    .border(1.dp, MaterialTheme.colorScheme.outline),
+                onCodigoDetectado = { codigo ->
+                    identificador = codigo
+                    busquedaViewModel.buscar(codigo)
+                }
             )
 
             Spacer(Modifier.height(12.dp))
