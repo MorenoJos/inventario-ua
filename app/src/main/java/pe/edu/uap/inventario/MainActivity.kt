@@ -35,6 +35,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import pe.edu.uap.inventario.ui.busqueda.EquipoFila
 
+import pe.edu.uap.inventario.ui.escaneo.CamaraPreview
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -94,29 +96,37 @@ fun HomeScreen(
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
-            Text("¡Bienvenido, $userName!", style = MaterialTheme.typography.titleLarge)
-            Text(
-                "Sesión activa en Almacén 5C",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "¡Bienvenido, $userName!",
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        "Sesión activa en Almacén 5C",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                TextButton(onClick = onLogout) {
+                    Text("Cerrar sesión")
+                }
+            }
 
             Spacer(Modifier.height(12.dp))
 
             // Reserva para cámara (Paso 8.2)
-            Box(
+            CamaraPreview(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(120.dp)
+                    .height(160.dp)
                     .border(1.dp, MaterialTheme.colorScheme.outline)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "Paso 8.2: cód. barras + OCR (números junto al código)",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            )
 
             Spacer(Modifier.height(12.dp))
 
@@ -142,6 +152,12 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                OutlinedButton(
+                    onClick = { busquedaViewModel.limpiarLista() },
+                    enabled = items.isNotEmpty() && !isLoading
+                ) {
+                    Text("Limpiar")
+                }
                 Button(
                     onClick = {
                         busquedaViewModel.buscar(identificador)
@@ -151,12 +167,6 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(if (isLoading) "Buscando..." else "Buscar")
-                }
-                OutlinedButton(
-                    onClick = { busquedaViewModel.limpiarLista() },
-                    enabled = items.isNotEmpty() && !isLoading
-                ) {
-                    Text("Limpiar")
                 }
             }
 
@@ -198,18 +208,6 @@ fun HomeScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            Button(
-                onClick = onLogout,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error
-                ),
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            ) {
-                Text("Cerrar sesión")
             }
         }
     }
