@@ -35,16 +35,25 @@ fun LoginScreen(
     var passwordVisible by remember { mutableStateOf(false) }
 
     val isLoading = uiState is LoginUiState.Loading
-
+    val snackbarHostState = remember { SnackbarHostState() }
 
     // Navegar cuando el login sea exitoso
     LaunchedEffect(uiState) {
-        if (uiState is LoginUiState.Success) {
-            onLoginSuccess()
+        when (uiState) {
+            is LoginUiState.Success -> onLoginSuccess()
+            is LoginUiState.Error -> {
+                snackbarHostState.showSnackbar(
+                    message = (uiState as LoginUiState.Error).message,
+                    withDismissAction = true
+                )
+            }
+            else -> Unit
         }
     }
 
-    Scaffold { innerPadding ->
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -107,6 +116,7 @@ fun LoginScreen(
                 Button(
                     onClick = {
                         focusManager.clearFocus()
+                        viewModel.resetError()
                         viewModel.loginWithGoogle(context)
                     },
                     modifier = Modifier
