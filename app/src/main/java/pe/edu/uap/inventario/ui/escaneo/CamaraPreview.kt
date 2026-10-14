@@ -3,6 +3,7 @@ package pe.edu.uap.inventario.ui.escaneo
 import android.Manifest
 import android.annotation.SuppressLint
 import android.graphics.Rect
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -18,11 +19,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -39,6 +45,10 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+
+import android.util.Size
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -93,11 +103,17 @@ private class OcrThrottle(private val intervaloMs: Long = 1000L) {
 @Composable
 private fun VistaCamara(modifier: Modifier, onCodigoDetectado: (String) -> Unit) {
     val lifecycleOwner = LocalContext.current as LifecycleOwner
+    val haptico = LocalHapticFeedback.current
     val barcodeScanner = remember { BarcodeScanning.getClient() }
     val textRecognizer = remember { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
     val antiRebote = remember { AntiRebote() }
     val ocrThrottle = remember { OcrThrottle() }
+
+    // Cámara enlazada: sirve para encender y apagar la linterna
+    var camara by remember { mutableStateOf<Camera?>(null) }
+    var linternaEncendida by remember { mutableStateOf(false) }
+    val tieneLinterna = camara?.cameraInfo?.hasFlashUnit() == true
 
     DisposableEffect(Unit) {
         onDispose {
@@ -116,6 +132,8 @@ private fun VistaCamara(modifier: Modifier, onCodigoDetectado: (String) -> Unit)
         if (esNuevo) {
             antiRebote.ultimoCodigo = limpio
             antiRebote.ultimoMillis = ahora
+            // Vibración corta: avisa que leyó sin tener que mirar la pantalla
+            haptico.performHapticFeedback(HapticFeedbackType.LongPress)
             onCodigoDetectado(limpio)
         }
     }
@@ -135,7 +153,18 @@ private fun VistaCamara(modifier: Modifier, onCodigoDetectado: (String) -> Unit)
                         it.setSurfaceProvider(previewView.surfaceProvider)
                     }
 
+                    // 1920x1080: con el valor por defecto (640x480) el código y los dígitos salen borrosos
+                    val seleccionResolucion = ResolutionSelector.Builder()
+                        .setResolutionStrategy(
+                            ResolutionStrategy(
+                                Size(1920, 1080),
+                                ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                            )
+                        )
+                        .build()
+
                     val analysis = ImageAnalysis.Builder()
+                        .setResolutionSelector(seleccionResolucion)
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
                     analysis.setAnalyzer(analysisExecutor) { imageProxy ->
@@ -150,7 +179,9 @@ private fun VistaCamara(modifier: Modifier, onCodigoDetectado: (String) -> Unit)
                     }
 
                     provider.unbindAll()
-                    provider.bindToLifecycle(
+                    // Al enlazar la cámara la linterna parte apagada
+                    linternaEncendida = false
+                    camara = provider.bindToLifecycle(
                         lifecycleOwner,
                         CameraSelector.DEFAULT_BACK_CAMERA,
                         preview,
@@ -161,6 +192,26 @@ private fun VistaCamara(modifier: Modifier, onCodigoDetectado: (String) -> Unit)
             }
         )
 
+        if (tieneLinterna) {
+            Button(
+                onClick = {
+                    linternaEncendida = !linternaEncendida
+                    camara?.cameraControl?.enableTorch(linternaEncendida)
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (linternaEncendida)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                )
+            ) {
+                Text("luz")
+            }
+        }
+
         Button(
             onClick = { ocrThrottle.forzarProximoIntento() },
             modifier = Modifier
@@ -170,7 +221,7 @@ private fun VistaCamara(modifier: Modifier, onCodigoDetectado: (String) -> Unit)
                 containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
             )
         ) {
-            Text("Txt")
+            Text("txt")
         }
     }
 }
