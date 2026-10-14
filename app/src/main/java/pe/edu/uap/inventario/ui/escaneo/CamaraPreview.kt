@@ -280,12 +280,13 @@ private fun procesarFrame(
                 // Si el barcode ya se leyó en este frame, el OCR no hace falta
                 if (barcodeEncontrado.get()) return@addOnSuccessListener
 
-                // Solo 8 dígitos exactos; de varios, el más cercano al centro
+                // Por cada línea: código patrimonial (8 dígitos) o serie alfanumérica suelta.
+                // De todas las líneas con candidato, la más cercana al centro.
                 val candidato = texto.textBlocks
                     .flatMap { it.lines }
-                    .filter { REGEX_8_DIGITOS.containsMatchIn(it.text) }
-                    .minByOrNull { distanciaAlCentro(it.boundingBox, ancho, alto) }
-                    ?.let { REGEX_8_DIGITOS.find(it.text)?.value }
+                    .mapNotNull { linea -> extraerCandidatoOcr(linea.text)?.let { linea to it } }
+                    .minByOrNull { (linea, _) -> distanciaAlCentro(linea.boundingBox, ancho, alto) }
+                    ?.second
                 if (candidato != null) onTextoDetectado(candidato)
             }
             .addOnCompleteListener { cerrarSiTerminado() }
@@ -301,6 +302,18 @@ private fun distanciaAlCentro(caja: Rect?, ancho: Int, alto: Int): Float {
 
 // Código patrimonial dentro de una línea de texto (8 dígitos sueltos, no parte de un número más largo)
 private val REGEX_8_DIGITOS = Regex("(?<!\\d)\\d{8}(?!\\d)")
+
+// Serie alfanumérica por OCR: se evalúa por palabra suelta (separada por espacios), no por línea
+// completa, para no capturar líneas tipo "INVENTARIO 2025" (cada palabra sola no tiene letra+dígito).
+// Mínimo 5 caracteres (series cortas de la UA), máximo 20, debe traer al menos una letra y un dígito.
+private val REGEX_SERIE_OCR = Regex("^(?=.*\\d)(?=.*[A-Za-z])[A-Za-z0-9-]{5,20}$")
+
+private fun extraerCandidatoOcr(textoLinea: String): String? {
+    REGEX_8_DIGITOS.find(textoLinea)?.let { return it.value }
+    return textoLinea
+        .split(Regex("\\s+"))
+        .firstOrNull { REGEX_SERIE_OCR.matches(it) }
+}
 
 // Para barcode: código patrimonial exacto o serie alfanumérica (letras y números mezclados)
 private val REGEX_CODIGO_8 = Regex("^\\d{8}$")
