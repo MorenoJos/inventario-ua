@@ -100,7 +100,8 @@ class BusquedaViewModel(
                         marca = detalle.data.marca,
                         modelo = detalle.data.modelo ?: "—",
                         serie = detalle.data.serie ?: "—",
-                        codigo = detalle.data.codigoPatrimonial ?: "—"
+                        codigo = detalle.data.codigoPatrimonial ?: "—",
+                        extras = listOf("Condición" to (detalle.data.estado ?: "—"))
                     )
                     is EquipoDetalle.Proyector -> EquipoFila(
                         estado = r.estadoGeneral ?: "—",
@@ -108,7 +109,8 @@ class BusquedaViewModel(
                         marca = detalle.data.marca,
                         modelo = detalle.data.modelo ?: "—",
                         serie = detalle.data.serie ?: "—",
-                        codigo = detalle.data.codigoPatrimonial ?: "—"
+                        codigo = detalle.data.codigoPatrimonial ?: "—",
+                        extras = listOf("Horas de uso" to (detalle.data.horasUso?.toString() ?: "—"))
                     )
                     is EquipoDetalle.Rae -> EquipoFila(
                         estado = "RAE",

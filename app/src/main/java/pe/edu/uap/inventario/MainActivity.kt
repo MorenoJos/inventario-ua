@@ -26,9 +26,9 @@ import pe.edu.uap.inventario.data.model.toDetalle
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -81,6 +81,7 @@ fun MainApp(viewModel: LoginViewModel = viewModel()) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     userName: String,
@@ -91,6 +92,8 @@ fun HomeScreen(
     val uiState by busquedaViewModel.uiState.collectAsState()
     val items by busquedaViewModel.items.collectAsState()
     val isLoading = uiState is BusquedaUiState.Loading
+    var filaSeleccionada by remember { mutableStateOf<EquipoFila?>(null) }
+    val sheetState = rememberModalBottomSheetState()
 
     Scaffold { innerPadding ->
         Column(
@@ -200,80 +203,163 @@ fun HomeScreen(
             )
             Spacer(Modifier.height(6.dp))
 
-            val hScroll = rememberScrollState()
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .horizontalScroll(hScroll)
-                    .verticalScroll(rememberScrollState())
-                    .border(1.dp, MaterialTheme.colorScheme.outline)
-            ) {
-                TablaHeader()
-                items.forEach { fila ->
-                    TablaRow(fila)
-                }
-                if (items.isEmpty()) {
-                    Text(
-                        "Aún no hay equipos. Busca un código o serie.",
-                        modifier = Modifier.padding(12.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            if (items.isEmpty()) {
+                Text(
+                    "Aún no hay equipos. Busca un código o serie.",
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(items) { fila ->
+                        EquipoCard(
+                            fila = fila,
+                            seleccionada = filaSeleccionada == fila,
+                            onClick = {
+                                filaSeleccionada = fila
+                            }
+                        )
+                    }
                 }
             }
+        }
+    }
+
+    val filaActual = filaSeleccionada
+    if (filaActual != null) {
+        ModalBottomSheet(
+            onDismissRequest = { filaSeleccionada = null },
+            sheetState = sheetState
+        ) {
+            EquipoDetalleContenido(filaActual)
         }
     }
 }
 
 @Composable
-private fun TablaHeader() {
-    Row(
-        Modifier
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .height(40.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Celda("Estado", true)
-        Celda("Categoría", true)
-        Celda("Marca", true)
-        Celda("Modelo", true)
-        Celda("Serie", true)
-        Celda("Cód. patr.", true)
-    }
-}
-
-@Composable
-private fun TablaRow(fila: EquipoFila) {
-    val bg = if (fila.estado == "RAE")
-        MaterialTheme.colorScheme.errorContainer
-    else
-        Color.Transparent
+private fun EquipoCard(
+    fila: EquipoFila,
+    seleccionada: Boolean,
+    onClick: () -> Unit
+) {
+    val esRae = fila.estado == "RAE"
+    val colorFondo = if (esRae) MaterialTheme.colorScheme.errorContainer
+    else MaterialTheme.colorScheme.surfaceVariant
+    val colorBadge = if (esRae) MaterialTheme.colorScheme.error
+    else MaterialTheme.colorScheme.primary
 
     Row(
-        Modifier
-            .background(bg)
-            .height(40.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Celda(fila.estado)
-        Celda(fila.categoria)
-        Celda(fila.marca)
-        Celda(fila.modelo)
-        Celda(fila.serie)
-        Celda(fila.codigo)
-    }
-}
-
-@Composable
-private fun RowScope.Celda(texto: String, header: Boolean = false) {
-    Text(
-        text = texto,
         modifier = Modifier
-            .width(110.dp)
-            .padding(horizontal = 6.dp),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        fontWeight = if (header) FontWeight.Bold else FontWeight.Normal,
-        fontSize = 12.sp
-    )
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .background(colorFondo, MaterialTheme.shapes.small)
+            .then(
+                if (seleccionada)
+                    Modifier.border(2.dp, colorBadge, MaterialTheme.shapes.small)
+                else Modifier
+            )
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = fila.estado,
+            color = colorBadge,
+            fontWeight = FontWeight.Bold,
+            fontSize = 11.sp,
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.extraSmall)
+                .padding(horizontal = 6.dp, vertical = 3.dp)
+        )
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "${fila.marca} ${fila.modelo}",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = FontWeight.Medium,
+                fontSize = 14.sp
+            )
+            Text(
+                fila.categoria,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Text(
+            fila.codigo,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun EquipoDetalleContenido(fila: EquipoFila) {
+    val esRae = fila.estado == "RAE"
+    // Verde para OPERATIVO, rojo para RAE. Usamos colores fijos (no los del tema)
+    // porque el significado operativo/dado-de-baja debe verse igual sin importar
+    // si el teléfono está en modo claro u oscuro.
+    val colorBadge = if (esRae) Color(0xFFD32F2F) else Color(0xFF2E7D32)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 32.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .background(colorBadge, MaterialTheme.shapes.medium)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = fila.estado,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        Text(
+            "${fila.marca} ${fila.modelo}",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            fila.categoria,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        CampoDetalle("Código patrimonial", fila.codigo)
+        CampoDetalle("Serie", fila.serie)
+        fila.extras.forEach { (etiqueta, valor) ->
+            CampoDetalle(etiqueta, valor)
+        }
+    }
+}
+
+@Composable
+private fun CampoDetalle(etiqueta: String, valor: String) {
+    Column(modifier = Modifier.padding(vertical = 6.dp)) {
+        Text(
+            etiqueta,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            valor,
+            style = MaterialTheme.typography.bodyLarge
+        )
+    }
 }
