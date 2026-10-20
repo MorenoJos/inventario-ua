@@ -55,6 +55,12 @@ private fun traducirError(e: Exception): Exception {
 
     return when {
         obj != null && codigo == "DUPLICADO" -> ErrorServidor(mensajeDuplicado(obj), codigo)
+        // El equipo SÍ se guardó: el alta no debe reintentarse (daría 409 duplicado).
+        // El idEquipo ya quedó en el logcat de AssetRepository para reconciliar.
+        codigo == "KARDEX_PENDIENTE" -> ErrorServidor(
+            "El equipo sí se guardó, pero no se pudo anotar el movimiento en el Kardex. " +
+                "Revísalo en la hoja antes de continuar.", codigo
+        )
         textoError == "No autorizado" ||
                 textoError?.contains("JWT", ignoreCase = true) == true ||
                 textoError?.contains("authorization", ignoreCase = true) == true ->
