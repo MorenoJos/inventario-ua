@@ -58,7 +58,7 @@ class BusquedaViewModel(
             // Ya consultado: no se vuelve a llamar al servidor.
             // Si era un código inexistente, se avisa igual (útil en la búsqueda manual).
             if (k in noReconocidos && pendientes == 0) {
-                _uiState.value = BusquedaUiState.Error("No encontrado: $id")
+                _uiState.value = BusquedaUiState.NoEncontrado(id)
             }
             return
         }
@@ -67,6 +67,16 @@ class BusquedaViewModel(
         pendientes++
         _uiState.value = BusquedaUiState.Loading
         cola.trySend(id)
+    }
+
+    // Se llama justo después de dar de alta un equipo. Hay que olvidar que ese código
+    // "no existía" (si no, buscarlo respondería "No encontrado" sin consultar al servidor)
+    // y volver a buscarlo, para que aparezca en la lista como confirmación del alta.
+    fun refrescarTrasAlta(identificador: String) {
+        val k = clave(identificador)
+        vistos.remove(k)
+        noReconocidos.remove(k)
+        buscar(identificador)
     }
 
     private suspend fun procesar(id: String) {
@@ -80,7 +90,7 @@ class BusquedaViewModel(
                     noReconocidos.add(k)
                     _uiState.value =
                         if (pendientes > 0) BusquedaUiState.Loading
-                        else BusquedaUiState.Error("No encontrado: $id")
+                        else BusquedaUiState.NoEncontrado(id)
                     return@fold
                 }
 
