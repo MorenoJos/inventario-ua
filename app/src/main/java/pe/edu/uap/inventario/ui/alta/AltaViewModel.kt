@@ -78,10 +78,9 @@ class AltaViewModel(
                     _uiState.update { it.copy(guardando = false, registrado = resultado) }
                 }
                 .onFailure { e ->
-                    // Mensaje técnico a propósito en esta primera versión: queremos ver
-                    // qué devuelve realmente el servidor antes de pulir los textos.
+                    // El repositorio ya entrega un mensaje claro y sin datos sensibles
                     _uiState.update {
-                        it.copy(guardando = false, error = "No se pudo registrar: ${e.message ?: e::class.simpleName}")
+                        it.copy(guardando = false, error = e.message ?: "No se pudo registrar el equipo")
                     }
                 }
         }
