@@ -38,13 +38,18 @@ class AltaViewModel(
 
     // ── Precarga desde la búsqueda ───────────────────────────────────────────
     // Si el usuario buscó algo que no existe y elige "Agregar", llegamos aquí con
-    // lo que buscó. Misma regla que el escáner: 8 dígitos exactos = código
-    // patrimonial; cualquier otra cosa = serie. Siempre se puede corregir a mano.
+    // lo que buscó. Regla: un identificador SOLO numérico (de 1 a 8 dígitos, como
+    // "2035" o "00002035") es código patrimonial; cualquier otra cosa es serie.
+    // (Antes solo contaba si tenía exactamente 8 dígitos: un código corto como
+    // "7777" caía en el campo Serie y se guardaba en la columna equivocada.)
+    // Si trae más de 8 dígitos se corta a 8, igual que haría el campo al escribir.
     fun precargar(identificador: String) {
         val id = identificador.trim()
         if (id.isEmpty()) return
+        val digitos = id.filter(Char::isDigit)
+        val esSoloNumerico = digitos.length == id.length && digitos.isNotEmpty()
         _uiState.update {
-            if (Regex("^\\d{8}$").matches(id)) it.copy(codigoPatrimonial = id)
+            if (esSoloNumerico) it.copy(codigoPatrimonial = digitos.take(8))
             else it.copy(serie = id.uppercase())
         }
     }

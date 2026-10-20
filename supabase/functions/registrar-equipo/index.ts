@@ -205,13 +205,17 @@ Deno.serve(async (req: Request) => {
 
     // 4) Escribir: primero el equipo, luego el Kardex.
     //    Sheets no permite una transacción entre pestañas; si el Kardex fallara,
-    //    el error incluye el idEquipo para poder reconciliar a mano.
+    //    se responde con codigo KARDEX_PENDIENTE e idEquipo para reconciliar a mano.
+    //    (La app NO debe reintentar el alta: el equipo ya está escrito.)
     await agregarFila(sheets, sheetId, cfg.rango, filaEquipo);
     try {
       await agregarFila(sheets, sheetId, "KARDEX!A:N", filaKardex);
     } catch (e) {
       console.error("Kardex falló tras agregar equipo", idEquipo, e);
-      return json({ error: "Equipo agregado, pero falló el registro en el Kardex", idEquipo }, 500);
+      return json(
+        { error: "El equipo se guardó, pero falló el registro en el Kardex", codigo: "KARDEX_PENDIENTE", idEquipo },
+        500,
+      );
     }
 
     return json({ ok: true, idEquipo, idMovimiento, categoria }, 201);

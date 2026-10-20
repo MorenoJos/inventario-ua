@@ -17,10 +17,13 @@ interface RaeData extends EquipoBase {}
 type Categoria = "CPU" | "MONITORES" | "PROYECTORES";
 
 // ── Normalización para comparar, sin importar cómo llegó el dato ────
+// El código se compara SIEMPRE a 8 dígitos (rellenando con ceros a la izquierda),
+// igual que hace registrar-equipo: si no, buscar "2035" no encuentra "00002035".
 function normCodigo(v: unknown): string | null {
   if (v == null) return null;
   const digits = String(v).replace(/\D/g, "");
-  return digits === "" ? null : digits;
+  if (digits === "") return null;
+  return digits.padStart(8, "0");
 }
 function normSerie(v: unknown): string | null {
   if (v == null) return null;
