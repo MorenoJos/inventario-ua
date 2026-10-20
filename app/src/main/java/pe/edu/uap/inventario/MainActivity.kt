@@ -2,11 +2,13 @@ package pe.edu.uap.inventario
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -40,6 +42,9 @@ import pe.edu.uap.inventario.ui.escaneo.CamaraPreview
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 
+import pe.edu.uap.inventario.ui.alta.AltaEquipoScreen
+import pe.edu.uap.inventario.ui.alta.AltaViewModel
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,6 +62,32 @@ fun MainApp(viewModel: LoginViewModel = viewModel()) {
     val sessionReady by viewModel.sessionReady.collectAsState()
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
 
+    // ViewModel del formulario de alta. Nombre completo en la llamada porque aquí
+    // el parámetro `viewModel` (el de login) taparía a la función viewModel().
+    val altaViewModel = androidx.lifecycle.viewmodel.compose.viewModel<AltaViewModel>()
+    // ¿Se está mostrando el formulario de alta? rememberSaveable para que sobreviva
+    // a una rotación de pantalla.
+    var mostrandoAlta by rememberSaveable { mutableStateOf(false) }
+
+    // Mismo BusquedaViewModel que usa HomeScreen (ambos están ligados a la Activity).
+    val busquedaViewModel = androidx.lifecycle.viewmodel.compose.viewModel<BusquedaViewModel>()
+    val altaState by altaViewModel.uiState.collectAsState()
+
+    // Cuando un alta sale bien, se vuelve a buscar el equipo recién agregado para que
+    // aparezca en la lista como confirmación. Se usa el código (relleno a 8 dígitos,
+    // como se guarda en el Sheet) o, si no hay código, la serie.
+    LaunchedEffect(altaState.registrado) {
+        if (altaState.registrado != null) {
+            val serie = altaState.serie.trim()
+            val id = when {
+                altaState.codigoPatrimonial.isNotBlank() -> altaState.codigoPatrimonial.padStart(8, '0')
+                serie.isNotBlank() && !serie.equals("S/N", ignoreCase = true) -> serie
+                else -> ""
+            }
+            if (id.isNotEmpty()) busquedaViewModel.refrescarTrasAlta(id)
+        }
+    }
+
     if (!sessionReady) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -65,12 +96,28 @@ fun MainApp(viewModel: LoginViewModel = viewModel()) {
             CircularProgressIndicator()
         }
     } else if (isLoggedIn) {
-        HomeScreen(
-            userName = viewModel.getCurrentUserName() ?: "Usuario",
-            onLogout = {
-                viewModel.logout()
-            }
-        )
+        if (mostrandoAlta) {
+            // El botón "atrás" del teléfono vuelve a la búsqueda en vez de salir de la app
+            BackHandler { mostrandoAlta = false }
+            AltaEquipoScreen(
+                viewModel = altaViewModel,
+                onCerrar = { mostrandoAlta = false }
+            )
+        } else {
+            HomeScreen(
+                userName = viewModel.getCurrentUserName() ?: "Usuario",
+                onLogout = {
+                    mostrandoAlta = false
+                    viewModel.logout()
+                },
+                onAgregarEquipo = { identificador ->
+                    // Formulario siempre limpio; si había algo escrito en el buscador, se precarga
+                    altaViewModel.reiniciar()
+                    altaViewModel.precargar(identificador)
+                    mostrandoAlta = true
+                }
+            )
+        }
     } else {
         LoginScreen(
             onLoginSuccess = {
@@ -86,6 +133,7 @@ fun MainApp(viewModel: LoginViewModel = viewModel()) {
 fun HomeScreen(
     userName: String,
     onLogout: () -> Unit,
+    onAgregarEquipo: (String) -> Unit,
     busquedaViewModel: BusquedaViewModel = viewModel()
 ) {
     var identificador by remember { mutableStateOf("") }
@@ -185,13 +233,47 @@ fun HomeScreen(
                 }
             }
 
-            if (uiState is BusquedaUiState.Error) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    (uiState as BusquedaUiState.Error).message,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
-                )
+            Spacer(Modifier.height(8.dp))
+
+            // Abre el formulario de alta. Si hay algo escrito en el buscador, llega precargado.
+            FilledTonalButton(
+                onClick = { onAgregarEquipo(identificador) },
+                enabled = !isLoading,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Agregar equipo")
+            }
+
+            when (val estado = uiState) {
+                is BusquedaUiState.Error -> {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        estado.message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                is BusquedaUiState.NoEncontrado -> {
+                    // No existe en el inventario: se ofrece agregarlo con lo que se buscó ya precargado
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "No encontrado: ${estado.identificador}",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        TextButton(onClick = { onAgregarEquipo(estado.identificador) }) {
+                            Text("Agregar")
+                        }
+                    }
+                }
+                else -> Unit
             }
 
             Spacer(Modifier.height(12.dp))
